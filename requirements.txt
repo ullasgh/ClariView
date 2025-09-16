@@ -1,0 +1,39 @@
+# Core
+langchain>=0.2.0
+langgraph>=0.0.50
+openai>=1.0.0
+tiktoken
+
+# Hugging Face (LLMs + embeddings + sentiment models)
+transformers>=4.40.0
+accelerate
+sentence-transformers
+torch
+datasets
+
+# News APIs + Requests
+requests
+newsapi-python   # For NewsAPI
+beautifulsoup4   # For scraping if API not available
+html5lib
+
+# Fact-checking / Verification
+googlesearch-python  # fallback for fact-check queries
+duckduckgo-search    # lightweight search wrapper
+
+# AWS Infrastructure
+boto3
+
+# Chrome Extension / Web Utils
+flask   # for local API endpoint testing
+flask-cors
+
+# Caching / Database
+pymongo        # if MongoDB is chosen
+# or DynamoDB if sticking to AWS
+# boto3 already covers DynamoDB
+
+# Utils
+python-dotenv  # for API keys
+numpy
+pandas
