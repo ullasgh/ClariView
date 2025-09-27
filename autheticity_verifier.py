@@ -1,70 +1,196 @@
-import requests
-from typing import Dict, Any
-from dotenv import load_dotenv
+# authenticity_verifier.py
 import os
-import summary
-from summary import get_five_points
-import content_extractor
+from dotenv import load_dotenv
 from content_extractor import extract_article_content
+from summary import get_five_points
+from tavily import TavilyClient
 
-article = extract_article_content("https://www.financialexpress.com/life/technology-apple-iphone-17-iphone-17-pro-iphone-17-pro-max-iphone-air-these-countries-will-get-esim-only-models-3976482/")
+# 🔹 Load environment variables
+load_dotenv()
+TAVILY_KEY = os.getenv("TAVILY_API_KEY")
 
-load_dotenv()  # take environment variables from .env.
-news_api_key = os.getenv("NEWS_API")
+# 🔹 Initialize Tavily client
+client = TavilyClient(TAVILY_KEY)
 
-
-# Replace with your own API key from https://newsapi.org
-NEWSAPI_KEY = news_api_key
-NEWSAPI_URL = "https://newsapi.org/v2/everything"
-
-def verify_authenticity(headline: str, max_results: int = 10) -> Dict[str, Any]:
+# 🔹 Function to verify a long sentence on the web
+def verify_long_sentence(sentence: str, max_results: int = 5):
     """
-    Verifies authenticity of a news headline using NewsAPI.
-    Returns score, sources, and verdict (Real/Fake).
+    Checks if a sentence exists on the web.
+    Returns Real if found in any result, else Fake.
     """
     try:
-        params = {
-            "q": headline,
-            "language": "en",
-            "pageSize": max_results,
-            "sortBy": "relevancy",
-            "apiKey": NEWSAPI_KEY,
-        }
-
-
-        response = requests.get(NEWSAPI_URL, params=params, timeout=10)
-        response.raise_for_status()
-        data = response.json()
-
-        if data.get("status") != "ok":
-            return {"error": data}
-
-        # Extract unique sources
-        sources = list({article["source"]["name"] for article in data.get("articles", [])})
-        num_sources = len(sources)
-
-        # Simple authenticity scoring
-        authenticity_score = num_sources / max_results  # crude scoring
-        verdict = "Real ✅" if authenticity_score >= 0.5 else "Fake ❌"
-
+        # Perform search
+        results = client.search(sentence, max_results=max_results)
+        sources = []
+        
+        # Handle different possible response formats
+        if results:
+            # Try different ways to extract URLs based on common API response patterns
+            results_to_process = []
+            
+            if isinstance(results, dict):
+                # Check for common result container keys
+                for key in ['results', 'data', 'items', 'search_results', 'web_results']:
+                    if key in results:
+                        results_to_process = results[key]
+                        break
+                else:
+                    # If no container key found, maybe the dict itself is a result
+                    if any(k in results for k in ['url', 'link', 'href', 'title']):
+                        results_to_process = [results]
+            elif isinstance(results, list):
+                results_to_process = results
+            
+            # Extract URLs from results
+            for item in results_to_process:
+                if isinstance(item, dict):
+                    # Try different possible URL keys
+                    url = item.get('url') or item.get('link') or item.get('href') or item.get('website')
+                    if url:
+                        sources.append(url)
+        
+        # Determine verdict
+        verdict = "Real ✅" if sources else "Fake ❌"
         return {
-            "headline": headline,
-            "sources_found": sources,
-            "authenticity_score": round(authenticity_score, 2),
-            "verdict": verdict,
+            "sentence": sentence, 
+            "verdict": verdict, 
+            "sources": sources,
+            "source_count": len(sources)
+        }
+    
+    except Exception as e:
+        return {
+            "sentence": sentence, 
+            "verdict": "Error ⚠️", 
+            "error": str(e),
+            "sources": []
         }
 
+# 🔹 Alternative search method using different search parameters
+def verify_with_different_method(sentence: str):
+    """
+    Alternative verification method with different search approach.
+    """
+    try:
+        # Try a more specific search
+        search_query = f'"{sentence[:100]}"'  # Use quotes for exact phrase search
+        results = client.search(search_query, max_results=3)
+        
+        sources = extract_sources_safely(results)
+        
+        if not sources:
+            # Try searching for key terms from the sentence
+            key_terms = extract_key_terms(sentence)
+            if key_terms:
+                results = client.search(key_terms, max_results=5)
+                sources = extract_sources_safely(results)
+        
+        verdict = "Real ✅" if sources else "Fake ❌"
+        return {
+            "sentence": sentence,
+            "verdict": verdict,
+            "sources": sources,
+            "method": "alternative"
+        }
+    
     except Exception as e:
-        return {"error": str(e)}
+        return {
+            "sentence": sentence,
+            "verdict": "Error ⚠️",
+            "error": str(e),
+            "method": "alternative"
+        }
 
+def extract_sources_safely(results):
+    """
+    Safely extract sources from search results.
+    """
+    sources = []
+    if not results:
+        return sources
+    
+    try:
+        # Handle string response
+        if isinstance(results, str):
+            return sources
+        
+        # Handle dict response
+        if isinstance(results, dict):
+            for key in ['results', 'data', 'items', 'search_results']:
+                if key in results and isinstance(results[key], list):
+                    results = results[key]
+                    break
+            else:
+                # If it's a single result dict
+                if 'url' in results:
+                    return [results['url']]
+                return sources
+        
+        # Handle list response
+        if isinstance(results, list):
+            for item in results:
+                if isinstance(item, dict):
+                    url = item.get('url') or item.get('link') or item.get('href')
+                    if url:
+                        sources.append(url)
+    
+    except Exception:
+        pass
+    
+    return sources
 
-# 🔹 Example usage
+def extract_key_terms(sentence: str):
+    """
+    Extract key terms from a sentence for searching.
+    """
+    import re
+    # Remove common words and extract meaningful terms
+    common_words = {'the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by', 'is', 'are', 'was', 'were'}
+    words = re.findall(r'\b\w+\b', sentence.lower())
+    key_terms = [word for word in words if len(word) > 3 and word not in common_words]
+    return ' '.join(key_terms[:5])  # Use top 5 key terms
+
+# 🔹 Main workflow
 if __name__ == "__main__":
-    test_headline = "Apple launches iPhone 17 with USB-C support"
-    result = verify_authenticity(test_headline)
-    print(result)
-    sample_article = article.get("content")
-    five_points_list = get_five_points(sample_article)
-    for point in five_points_list:
-        result = verify_authenticity(test_headline)
-        print(result)
+    # Example article URL
+    url = "https://www.financialexpress.com/life/technology-apple-iphone-17-iphone-17-pro-iphone-17-pro-max-iphone-air-these-countries-will-get-esim-only-models-3976482/"
+    
+    print("🔍 Starting article verification process...\n")
+    
+    # Step 1: Extract article content
+    print("📄 Extracting article content...")
+    article = extract_article_content(url)
+    article_text = article.get("content", "")
+    
+    if not article_text:
+        print("❌ Could not extract article content.")
+        exit(1)
+    
+    print(f"✅ Article extracted ({len(article_text)} characters)\n")
+    
+    # Step 2: Extract 5 key points
+    print("🔑 Extracting key points...")
+    five_points_list = get_five_points(article_text)
+    print(f"✅ Extracted {len(five_points_list)} key points\n")
+    
+    # Step 3: Verify each point online
+    print("🌐 Verifying points online...\n")
+    for i, point in enumerate(five_points_list, 1):
+        print(f"Point {i}: {point[:80]}{'...' if len(point) > 80 else ''}")
+        
+        # Try primary method
+        result = verify_long_sentence(point)
+        
+        # If primary method fails, try alternative
+        if result['verdict'] == "Error ⚠️":
+            print(f"   Primary method failed, trying alternative...")
+            result = verify_with_different_method(point)
+        
+        print(f"   Verdict: {result['verdict']}")
+        if result.get('sources'):
+            print(f"   Sources found: {len(result['sources'])}")
+            for source in result['sources'][:3]:  # Show first 3 sources
+                print(f"     - {source}")
+        if result.get('error'):
+            print(f"   Error: {result['error']}")
+        print()

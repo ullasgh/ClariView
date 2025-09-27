@@ -21,7 +21,7 @@ def get_five_points(article_text: str) -> list:
     """
     Returns the 5 most important sentences from the article as a list.
     """
-    prompt = f"Extract the 5 most important sentences from the following article:\n\n{article_text}"
+    prompt = f"Extract the 5 most important fact/claims which should only contain the claim/fact from the following article:\n\n{article_text}"
 
     response = client.chat_completion(
         messages=[{"role": "user", "content": prompt}],
