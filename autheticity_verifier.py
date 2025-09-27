@@ -175,6 +175,12 @@ if __name__ == "__main__":
     
     # Step 3: Verify each point online
     print("🌐 Verifying points online...\n")
+    
+    # Track verification results
+    verification_results = []
+    real_count = 0
+    total_points = len(five_points_list)
+    
     for i, point in enumerate(five_points_list, 1):
         print(f"Point {i}: {point[:80]}{'...' if len(point) > 80 else ''}")
         
@@ -186,6 +192,12 @@ if __name__ == "__main__":
             print(f"   Primary method failed, trying alternative...")
             result = verify_with_different_method(point)
         
+        # Count real results
+        if result['verdict'] == "Real ✅":
+            real_count += 1
+        
+        verification_results.append(result)
+        
         print(f"   Verdict: {result['verdict']}")
         if result.get('sources'):
             print(f"   Sources found: {len(result['sources'])}")
@@ -194,3 +206,26 @@ if __name__ == "__main__":
         if result.get('error'):
             print(f"   Error: {result['error']}")
         print()
+    
+    # 🔹 Display final authenticity score
+    print("=" * 60)
+    print("📊 AUTHENTICITY SCORE")
+    print("=" * 60)
+    print(f"✅ Verified as Real: {real_count}/{total_points} points")
+    print(f"🎯 Authenticity Score: {real_count}/{total_points} ({real_count/total_points*100:.1f}%)")
+    
+    # Add interpretation comment
+    if real_count == total_points:
+        print("💯 Comment: Highly authentic - All key points verified online")
+    elif real_count >= total_points * 0.8:
+        print("✨ Comment: Very authentic - Most key points verified online")
+    elif real_count >= total_points * 0.6:
+        print("👍 Comment: Moderately authentic - Majority of points verified")
+    elif real_count >= total_points * 0.4:
+        print("⚠️  Comment: Partially authentic - Some points verified")
+    elif real_count > 0:
+        print("🔍 Comment: Low authenticity - Few points verified online")
+    else:
+        print("❌ Comment: Cannot verify authenticity - No points found online")
+    
+    print("=" * 60)
