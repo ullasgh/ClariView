@@ -3,6 +3,8 @@ langchain>=0.2.0
 langgraph>=0.0.50
 openai>=1.0.0
 tiktoken
+newspaper3k
+spacy
 
 # Hugging Face (LLMs + embeddings + sentiment models)
 transformers>=4.40.0
