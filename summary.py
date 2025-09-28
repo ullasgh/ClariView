@@ -1,4 +1,3 @@
-# summary.py
 from openai import OpenAI
 from dotenv import load_dotenv
 import os
@@ -23,16 +22,30 @@ except Exception as e:
     exit(1)
 
 
-def get_five_points(article_text: str) -> list:
+def get_five_points(article_text: str,sample_article_title: str) -> list:
     """
     Returns the 5 most important sentences from the article as a list.
     """
-    prompt = f"""Extract the 5 most important facts/claims from the following article in a short point. 
-    
-    Return them as a numbered list (1. 2. 3. 4. 5.) with each point containing only the key fact or claim.
-    
-    Article:
-    {article_text}"""
+    prompt = f"""Extract the 5 most important facts/claims from the following article that are DIRECTLY RELATED to the title. 
+
+    IMPORTANT REQUIREMENTS:
+    1. Each point must be directly connected to the main topic in the title
+    2. Use specific names, places, organizations, and events mentioned in the article - NO pronouns like "he", "she", "it", "they"
+    3. Include key entities and proper nouns from the article
+    4. Focus on facts that explain WHY this story is newsworthy
+    5. Each point should be a complete, standalone fact that makes sense without additional context
+
+    Title: "{sample_article_title}"
+
+    Article Content:
+    {article_text}
+
+    Return exactly 5 numbered points (1. 2. 3. 4. 5.) where each point:
+    - Contains specific names and entities from the article
+    - Directly relates to the title's main topic
+    - Is factual and verifiable
+    - Uses full words instead of pronouns
+    - Explains a key aspect of the story"""
 
     try:
         response = client.chat.completions.create(
@@ -88,12 +101,13 @@ if __name__ == "__main__":
     )
     
     sample_article = article.get("content")
+    sample_article_title = article.get("title")
     
     if sample_article:
         print(f"✅ Article extracted: {len(sample_article)} characters")
         print("\n🔍 Extracting 5 key points...")
         
-        five_points_list = get_five_points(sample_article)
+        five_points_list = get_five_points(sample_article, sample_article_title)
         
         print("\n📋 5 Key Points:")
         print("=" * 60)

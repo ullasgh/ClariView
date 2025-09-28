@@ -44,6 +44,36 @@ Create a search query that would find articles with the opposite viewpoint. Make
         key_words = point.split()[:5]
         return f"{' '.join(key_words)} problems criticism disadvantages"
 
+def is_news_website(url):
+    """Check if URL is from a news website (not social media)."""
+    if not url:
+        return False
+    
+    # Convert to lowercase for checking
+    url_lower = url.lower()
+    
+    # Block social media and non-news platforms
+    blocked_domains = [
+        'facebook.com', 'fb.com', 'instagram.com', 'twitter.com', 'x.com',
+        'youtube.com', 'youtu.be', 'tiktok.com', 'linkedin.com', 'pinterest.com',
+        'reddit.com', 'tumblr.com', 'snapchat.com', 'whatsapp.com', 'telegram.org'
+    ]
+    
+    # Check if URL contains any blocked domains
+    for domain in blocked_domains:
+        if domain in url_lower:
+            return False
+    
+    # Allow common news website patterns
+    news_indicators = [
+        '.com', '.org', '.net', '.in', '.co.uk', '.au', '.ca', '.news',
+        'news', 'times', 'post', 'herald', 'tribune', 'guardian', 'reuters',
+        'bloomberg', 'cnn', 'bbc', 'npr', 'abc', 'nbc', 'cbs', 'fox'
+    ]
+    
+    # If it's not blocked and has news-like indicators, consider it valid
+    return True
+
 def search_for_opposite_articles(query):
     """Search Tavily once for articles with opposite viewpoint."""
     try:
@@ -51,16 +81,22 @@ def search_for_opposite_articles(query):
         
         response = tavily_client.search(
             query=query,
-            max_results=3,
+            max_results=5,  # Increased to account for filtering
             include_answer=False,
             include_raw_content=False  # We only need URLs
         )
         
         results = response.get('results', [])
-        urls = [result.get('url') for result in results if result.get('url')]
+        all_urls = [result.get('url') for result in results if result.get('url')]
         
-        print(f"   📊 Found {len(urls)} articles")
-        return urls
+        # Filter to only include news websites
+        news_urls = [url for url in all_urls if is_news_website(url)]
+        
+        # Limit to top 3 news URLs
+        news_urls = news_urls[:3]
+        
+        print(f"   📊 Found {len(all_urls)} total results, {len(news_urls)} news articles")
+        return news_urls
     
     except Exception as e:
         print(f"   ⚠️ Search error: {e}")
@@ -74,6 +110,7 @@ def main(article_url):
     try:
         article = extract_article_content(article_url)
         article_text = article.get("content", "")
+        article_title = article.get("title", "")
         
         if not article_text:
             print("❌ Could not extract article content.")
@@ -87,7 +124,7 @@ def main(article_url):
 
     # Step 2: Extract 5 key points
     try:
-        five_points = get_five_points(article_text)
+        five_points = get_five_points(article_text, article_title)
         print(f"✅ Extracted {len(five_points)} key points")
     
     except Exception as e:
@@ -121,6 +158,13 @@ def main(article_url):
     
     return results
 
+def get_all_urls(results):
+    """Extract all URLs from all points and return as a single list."""
+    all_urls = []
+    for result in results:
+        all_urls.extend(result.get('article_urls', []))
+    return all_urls
+
 def print_results(results):
     """Print the results showing URLs for each point."""
     print("\n" + "="*80)
@@ -148,3 +192,10 @@ if __name__ == "__main__":
     
     results = main(test_url)
     print_results(results)
+    
+    # Get all URLs from all points
+    all_urls = get_all_urls(results)
+    print(f"\n📝 Total URLs collected: {len(all_urls)}")
+    print("🔗 All URLs:")
+    for i, url in enumerate(all_urls, 1):
+        print(f"   {i}. {url}")
