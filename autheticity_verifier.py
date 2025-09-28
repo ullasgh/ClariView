@@ -153,7 +153,7 @@ def extract_key_terms(sentence: str):
 # 🔹 Main workflow
 if __name__ == "__main__":
     # Example article URL
-    url = "https://www.financialexpress.com/life/technology-apple-iphone-17-iphone-17-pro-iphone-17-pro-max-iphone-air-these-countries-will-get-esim-only-models-3976482/"
+    url = "https://thewire.in/politics/sonam-wangchuk-arrest-political-reactions-ladakh-leh"
     
     print("🔍 Starting article verification process...\n")
     
@@ -161,6 +161,7 @@ if __name__ == "__main__":
     print("📄 Extracting article content...")
     article = extract_article_content(url)
     article_text = article.get("content", "")
+    sample_article_title=article.get("title")
     
     if not article_text:
         print("❌ Could not extract article content.")
@@ -170,7 +171,7 @@ if __name__ == "__main__":
     
     # Step 2: Extract 5 key points
     print("🔑 Extracting key points...")
-    five_points_list = get_five_points(article_text)
+    five_points_list = get_five_points(article_text,sample_article_title)
     print(f"✅ Extracted {len(five_points_list)} key points\n")
     
     # Step 3: Verify each point online
